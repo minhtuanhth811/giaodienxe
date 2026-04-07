@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart AGV Dashboard</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="lineAlert" class="line-lost-overlay" style="display: none;">
+        <div class="alert-content">
+            <div class="alert-icon">⚠️</div>
+            <h1>CRITICAL ERROR: LINE LOST</h1>
+            <p>Xe đã chệch khỏi đường dẫn. Đang tạm dừng toàn bộ motor.</p>
+            <button onclick="dismissAlert()" class="btn-dismiss">Đã hiểu (Chuyển về MANUAL)</button>
+        </div>
+    </div>
+
+    <div class="hmi-container">
+        <header class="control-header">
+            <div class="brand">
+                <div class="status-indicator" id="connStatus"></div>
+                <h1>AGV SYSTEM CONTROL</h1>
+            </div>
+            <div class="system-time" id="sysTime">00:00:00</div>
+        </header>
+
+        <main class="dashboard-grid">
+
+            <section class="panel mode-panel">
+                <div class="mode-switches">
+                    <button onclick="setMode('MANUAL')" id="btnManual" class="btn-mode active">MANUAL</button>
+                    <button onclick="setMode('AUTO')" id="btnAuto" class="btn-mode">AUTO</button>
+                    <button onclick="triggerEmergency()" id="btnEmergency" class="btn-mode danger">EMERGENCY</button>
+                </div>
+            </section>
+
+            <section class="panel mission-panel">
+                <div class="panel-header">
+                    <h2>Mission Flow</h2>
+                    <span class="badge" id="missionStatus">Sẵn sàng</span>
+                </div>
+                <div class="stepper">
+                    <div class="step active" id="step0">
+                        <div class="icon">S</div><span>Start</span>
+                    </div>
+                    <div class="line" id="line0"></div>
+                    <div class="step" id="step1">
+                        <div class="icon">➔</div><span>Dò Line</span>
+                    </div>
+                    <div class="line" id="line1"></div>
+                    <div class="step" id="step2">
+                        <div class="icon">A</div><span>Gắp Hàng</span>
+                    </div>
+                    <div class="line" id="line2"></div>
+                    <div class="step" id="step3">
+                        <div class="icon">➔</div><span>Về B</span>
+                    </div>
+                    <div class="line" id="line3"></div>
+                    <div class="step" id="step4">
+                        <div class="icon">B</div><span>Thả Hàng</span>
+                    </div>
+                    <div class="line" id="line4"></div>
+                    <div class="step" id="step5">
+                        <div class="icon">✓</div><span>Hoàn thành</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-header">
+                    <h2>Drive Control</h2>
+                </div>
+                <div class="d-pad-container">
+                    <div class="d-pad">
+                        <div class="empty"></div>
+                        <button class="btn-dir" onmousedown="move('F')" onmouseup="move('S')"><span>⯅</span></button>
+                        <div class="empty"></div>
+
+                        <button class="btn-dir" onmousedown="move('L')" onmouseup="move('S')"><span>⯇</span></button>
+                        <button class="btn-stop" onclick="move('FORCE_STOP')"><span>STOP</span></button>
+                        <button class="btn-dir" onmousedown="move('R')" onmouseup="move('S')"><span>⯈</span></button>
+
+                        <div class="empty"></div>
+                        <button class="btn-dir" onmousedown="move('B')" onmouseup="move('S')"><span>⯆</span></button>
+                        <div class="empty"></div>
+                    </div>
+
+
+                    <div class="side-actions">
+                        <button class="btn-action pick" onclick="manualPick()">
+                            <span><i class="fas fa-compress-arrows-alt"
+                                    style="font-size: 20px; display: block; margin-bottom: 5px;"></i></span>
+                            <span>PICK</span>
+                        </button>
+                        <button class="btn-action drop" onclick="manualDrop()">
+                            <span><i class="fas fa-expand-arrows-alt"
+                                    style="font-size: 20px; display: block; margin-bottom: 5px;"></i></span>
+                            <span>DROP</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel telemetry-panel">
+                <div class="panel-header">
+                    <h2>Telemetry</h2>
+                    <button onclick="onEraMessageReceived('V5', 99)"
+                        style="background:transparent; border:none; color:var(--color-red); cursor:pointer; font-size:0.75rem; text-decoration:underline;">[Test
+                        Lỗi Mất Line]</button>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <span class="label">CURRENT MODE</span>
+                        <span class="value text-blue" id="modeDisplay">MANUAL</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="label">TOTAL DELIVERED</span>
+                        <span class="value font-mono" id="totalCount">00</span>
+                    </div>
+                </div>
+                <div class="terminal" id="terminalBox">
+                    <div class="log-line"><span class="time">[SYS]</span> Khởi tạo hệ thống thành công...</div>
+                </div>
+            </section>
+
+            <section class="panel arm-panel">
+                <div class="panel-header arm-panel-header">
+                    <h2>Cánh tay robot 6 bậc</h2>
+
+                </div>
+                <div id="armControlsGrid" class="arm-controls-grid">
+                </div>
+            </section>
+
+            <section class="panel db-panel">
+                <div class="panel-header">
+                    <h2>Warehouse Management System (WMS)</h2>
+                    <button onclick="exportWMS()" class="btn-export">⬇ Xuất CSV</button>
+                </div>
+                <div class="table-wrap" id="wmsTableWrap">
+                    <table id="wmsTable">
+                        <thead>
+                            <tr>
+                                <th>Mã Kiện</th>
+                                <th>Gắp tại A (Time)</th>
+                                <th>Thả tại B (Time)</th>
+                                <th>T.Gian Vận Chuyển</th>
+                                <th>Trạng Thái WMS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="wmsBody">
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+
+</html>
