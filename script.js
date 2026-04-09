@@ -23,23 +23,6 @@ const JOINTS_WITH_NAMES = [
 const eraWidget = new EraWidget();
 
 
-eraWidget.init({
-  onConfiguration: (configuration) => {
-    action = configuration.actions;
-    pressUpConfig = configuration.actions[0];
-    releaseUpConfig = configuration.actions[1];
-    pressDownConfig = configuration.actions[2];
-    releaseDownConfig = configuration.actions[3];
-    pressLeftConfig = configuration.actions[4];
-    releaseLeftConfig = configuration.actions[5];
-    pressRightConfig = configuration.actions[6];
-    releaseRightConfig = configuration.actions[7];
-    PickConfig = configuration.actions[8];
-    DropConfig = configuration.actions[9];
-    
-  },
-});
-
 function pressing(direction){
     console.log(direction);
     if (direction == 'up'){
@@ -458,6 +441,22 @@ function exportWMS() {
 }
 
 initDashboard();
+eraWidget.init({
+  onConfiguration: (configuration) => {
+    action = configuration.actions;
+    pressUpConfig = configuration.actions[0];
+    releaseUpConfig = configuration.actions[1];
+    pressDownConfig = configuration.actions[2];
+    releaseDownConfig = configuration.actions[3];
+    pressLeftConfig = configuration.actions[4];
+    releaseLeftConfig = configuration.actions[5];
+    pressRightConfig = configuration.actions[6];
+    releaseRightConfig = configuration.actions[7];
+    PickConfig = configuration.actions[8];
+    DropConfig = configuration.actions[9];
+    
+  },
+});
 
 // GIẢ LẬP TEST AUTO
 document.getElementById('btnAuto').addEventListener('click', () => {
