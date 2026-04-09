@@ -20,6 +20,59 @@ const JOINTS_WITH_NAMES = [
     { id: 6, label: 'Gripper' }
 ];
 
+const eraWidget = new EraWidget();
+
+
+eraWidget.init({
+  onConfiguration: (configuration) => {
+    action = configuration.actions;
+    pressUpConfig = configuration.actions[0];
+    releaseUpConfig = configuration.actions[1];
+    pressDownConfig = configuration.actions[2];
+    releaseDownConfig = configuration.actions[3];
+    pressLeftConfig = configuration.actions[4];
+    releaseLeftConfig = configuration.actions[5];
+    pressRightConfig = configuration.actions[6];
+    releaseRightConfig = configuration.actions[7];
+    PickConfig = configuration.actions[8];
+    DropConfig = configuration.actions[9];
+    
+  },
+});
+
+function pressing(direction){
+    console.log(direction);
+    if (direction == 'up'){
+        eraWidget.triggerAction(action[0]?.action, null);
+    } else if (direction == 'down'){
+        eraWidget.triggerAction(action[2]?.action, null);
+    } else if (direction == 'left'){
+        eraWidget.triggerAction(action[4]?.action, null);
+    } else if (direction == 'right'){
+        eraWidget.triggerAction(action[6]?.action, null);
+    }
+}
+function release(direction){
+    console.log(direction);
+    if (direction == 'up'){
+        eraWidget.triggerAction(action[1]?.action, null);
+    } else if (direction == 'down'){
+        eraWidget.triggerAction(action[3]?.action, null);
+    } else if (direction == 'left'){
+        eraWidget.triggerAction(action[5]?.action, null);
+    } else if (direction == 'right'){
+        eraWidget.triggerAction(action[7]?.action, null);
+    }
+}
+function manualPick(){
+    console.log(direction);
+    eraWidget.triggerAction(action[8]?.action, null);
+}
+function manualDrop(){
+    console.log(direction);
+    eraWidget.triggerAction(action[9]?.action, null);
+}
+
 // --- 2. KHỞI TẠO HỆ THỐNG ---
 function initDashboard() {
     const armHeader = document.querySelector('.arm-panel-header');
@@ -71,29 +124,28 @@ function formatDuration(ms) {
     return m > 0 ? `${m}p ${s}s` : `${s} giây`;
 }
 
-// --- 4. GIAO TIẾP VỚI E-RA API ---
-function sendToEra(pin, value) {
-    console.log(`[E-RA TX] Pin: ${pin} | Val: ${value}`);
-}
-
 function setMode(mode) {
-    // CHẶN TUYỆT ĐỐI: Đang EMERGENCY thì không cho đổi sang bất cứ mode nào
     if (currentMode === 'EMERGENCY') {
         printLog('HỆ THỐNG ĐANG KHÓA CỨNG! Hãy nhấn RESET SYSTEM trên nút màu đỏ.', true);
-        return; // Thoát hàm ngay lập tức
+        return;
     }
 
     currentMode = mode;
     const stopBtn = document.querySelector('.btn-stop');
+    const statusObj = document.getElementById('missionStatus'); // Lấy cái Badge
 
-    // Các thiết lập giao diện bên dưới giữ nguyên...
+    // RESET Badge màu sắc
+    if (statusObj) {
+        statusObj.classList.remove('moving-status', 'done-status', 'ready-status');
+    }
+
+    // Reset nút Stop/Start ở giữa
     stopBtn.innerText = 'STOP';
     stopBtn.classList.remove('is-start', 'is-auto-start');
     stopBtn.classList.add('is-stop');
-
-    document.querySelectorAll('.btn-mode').forEach(btn => {
-        btn.classList.remove('active', 'active-auto');
-    });
+    // Xóa bỏ style inline do Emergency áp vào (nếu có)
+    stopBtn.style.background = '';
+    stopBtn.style.boxShadow = '';
 
     document.getElementById('modeDisplay').innerText = mode;
 
@@ -101,18 +153,21 @@ function setMode(mode) {
         isAutoRunning = false;
         clearInterval(testInterval);
         document.getElementById('btnManual').classList.add('active');
-        document.getElementById('modeDisplay').className = 'value font-mono text-blue';
-        sendToEra('V1', 0);
-        setMissionStep(0);
+        document.getElementById('btnAuto').classList.remove('active-auto');
+        if (statusObj) statusObj.innerText = 'Chế độ tay';
         printLog('Đã chuyển sang MANUAL.');
     } else if (mode === 'AUTO') {
-        isAutoRunning = true;
-        currentStep = 1;
+        isAutoRunning = false; // Đợi bấm nút giữa mới chạy thực sự
+        currentStep = 0;
         document.getElementById('btnAuto').classList.add('active-auto');
-        document.getElementById('modeDisplay').className = 'value font-mono text-green';
-        sendToEra('V1', 1);
-        printLog('Đã chuyển sang AUTO.');
-        startAutoLogic();
+        document.getElementById('btnManual').classList.remove('active');
+
+        // LÀM SÁNG BADGE XANH DƯƠNG
+        if (statusObj) {
+            statusObj.innerText = 'Sẵn sàng';
+            statusObj.classList.add('ready-status');
+        }
+        printLog('Đã chuyển sang AUTO (Sẵn sàng).');
     }
 }
 function triggerEmergency() {
@@ -154,8 +209,6 @@ function triggerEmergency() {
 
 function move(direction) {
     if (currentMode === 'EMERGENCY') {
-        // Nếu là lệnh STOP thì không cần báo (vì hệ thống đang stop rồi)
-        // Nhưng nếu là các hướng di chuyển khác thì phải báo lỗi
         if (direction !== 'S' && direction !== 'FORCE_STOP') {
             printLog('HỆ THỐNG ĐANG KHÓA! Hãy nhấn RESET SYSTEM trên nút màu đỏ.', true);
         }
@@ -164,13 +217,21 @@ function move(direction) {
 
     const stopBtn = document.querySelector('.btn-stop');
 
+    // --- BẢNG MAPPING LỆNH CHỮ SANG SỐ ĐỂ GỬI QUA E-RA ---
+    // 0: STOP, 1: FORWARD, 2: BACKWARD, 3: LEFT, 4: RIGHT
+    let eraValue = 0;
+    if (direction === 'F') eraValue = 1;
+    else if (direction === 'B') eraValue = 2;
+    else if (direction === 'L') eraValue = 3;
+    else if (direction === 'R') eraValue = 4;
+    else eraValue = 0; // Mặc định cho S, STOP, FORCE_STOP
+
     // --- XỬ LÝ CHẾ ĐỘ AUTO ---
     if (currentMode === 'AUTO') {
         if (direction === 'FORCE_STOP') {
             if (!isAutoRunning) {
                 isAutoRunning = true;
                 stopBtn.innerText = 'STOP';
-                // Xóa class xanh, thêm class đỏ
                 stopBtn.classList.remove('is-start', 'is-auto-start');
                 stopBtn.classList.add('is-stop');
 
@@ -179,12 +240,13 @@ function move(direction) {
             } else {
                 isAutoRunning = false;
                 clearInterval(testInterval);
-                sendToEra('V2', 'STOP');
+
+                // Gửi số 0 thay vì chữ 'STOP'
+                sendToEra('V2', 0);
 
                 stopBtn.innerText = 'START';
-                // QUAN TRỌNG: Xóa class đỏ, thêm class xanh
                 stopBtn.classList.remove('is-stop');
-                stopBtn.classList.add('is-start'); // Hoặc is-auto-start tùy Khoa đặt tên
+                stopBtn.classList.add('is-start');
 
                 printLog('AUTO: Đã tạm dừng.', '#ef4444');
             }
@@ -196,30 +258,32 @@ function move(direction) {
 
     if (direction === 'FORCE_STOP') {
         if (stopBtn.innerText === 'STOP') {
-            // --- CHUYỂN SANG TRẠNG THÁI START (XANH) ---
-            sendToEra('V2', 'S');
+            // Gửi số 0 (Dừng xe)
+            sendToEra('V2', 0);
             stopBtn.innerText = 'START';
 
-            stopBtn.classList.remove('is-stop'); // Xóa class đỏ
-            stopBtn.classList.add('is-start');    // Thêm class xanh
+            stopBtn.classList.remove('is-stop');
+            stopBtn.classList.add('is-start');
 
             printLog('MANUAL: Đã dừng xe. (Ấn START để tiếp tục)', '#f59e0b');
         } else {
-            // --- CHUYỂN SANG TRẠNG THÁI STOP (ĐỎ) ---
             stopBtn.innerText = 'STOP';
 
-            stopBtn.classList.remove('is-start'); // Xóa class xanh
-            stopBtn.classList.add('is-stop');     // Thêm class đỏ
+            stopBtn.classList.remove('is-start');
+            stopBtn.classList.add('is-stop');
 
             printLog('MANUAL: Hệ thống sẵn sàng điều khiển.', '#10b981');
         }
         return;
     }
+
     // Gửi lệnh di chuyển chỉ khi nút đang ở trạng thái STOP (Sẵn sàng)
     if (stopBtn.innerText === 'STOP') {
-        sendToEra('V2', direction);
+        // Gửi con số (1, 2, 3, 4 hoặc 0) đã mapping ở đầu hàm
+        sendToEra('V2', eraValue);
+
         if (direction !== 'S') {
-            printLog(`Motor Drive: ${direction}`);
+            printLog(`Motor Drive: ${direction} (Mã: ${eraValue})`);
         }
     } else {
         if (direction !== 'S') {
@@ -293,49 +357,32 @@ function setMissionStep(stepIndex) {
 
     if (statusObj) {
         statusObj.innerText = labels[stepIndex] || 'N/A';
-
-        // Xóa sạch các class màu cũ trước khi đặt màu mới
-        statusObj.classList.remove('moving-status', 'done-status');
+        // Xóa sạch màu cũ
+        statusObj.classList.remove('moving-status', 'done-status', 'ready-status');
 
         if (stepIndex >= 1 && stepIndex <= 4) {
-            // TRƯỜNG HỢP 1: Đang làm (Hiện màu VÀNG)
-            statusObj.classList.add('moving-status');
-        }
-        else if (stepIndex === 5) {
-            // TRƯỜNG HỢP 2: Hoàn thành (Hiện màu XANH LÁ)
-            statusObj.classList.add('done-status');
-        }
-        // TRƯỜNG HỢP 3: Mặc định (Sẵn sàng) -> Sẽ không có class màu, hiện màu xám/đen gốc
-    }
-    // --- PHẦN QUAN TRỌNG: RESET TRẠNG THÁI KHI BẮT ĐẦU VÒNG MỚI ---
-    // Nếu stepIndex = 0 hoặc 1 (bắt đầu chu trình mới), ta xóa sạch màu của các bước cũ
-    if (stepIndex <= 1) {
-        for (let j = 0; j <= 5; j++) {
-            const s = document.getElementById('step' + j);
-            const l = document.getElementById('line' + j);
-            if (s) s.classList.remove('active', 'done');
-            if (l) l.classList.remove('done');
+            statusObj.classList.add('moving-status'); // Vàng
+        } else if (stepIndex === 5) {
+            statusObj.classList.add('done-status');   // Xanh lá
+        } else if (stepIndex === 0 && currentMode === 'AUTO') {
+            statusObj.classList.add('ready-status');  // Xanh dương
         }
     }
 
-    // --- CẬP NHẬT ĐÈN THEO BƯỚC HIỆN TẠI ---
+    // Logic xử lý các vòng tròn (step) bên dưới
     for (let i = 0; i <= 5; i++) {
         const step = document.getElementById('step' + i);
         const line = document.getElementById('line' + i);
+        if (!step) continue;
 
-        if (!step) continue; // Bỏ qua nếu không tìm thấy ID
-
-        // Xóa trạng thái cũ để cập nhật mới
         step.classList.remove('active', 'done');
         if (line) line.classList.remove('done');
 
         if (i < stepIndex) {
-            // Các bước đã qua: Hiện màu xanh (Done)
             step.classList.add('done');
             if (line) line.classList.add('done');
         } else if (i === stepIndex) {
-            // Bước hiện tại: Hiện màu xanh dương (Active)
-            step.classList.add('active');
+            step.classList.add('active'); // Luôn là Xanh dương theo ý Khoa
         }
     }
 }
@@ -344,19 +391,22 @@ function handleWMSRecord(step) {
     const timeNow = new Date();
     const timeStr = timeNow.toLocaleTimeString('vi-VN', { hour12: false });
 
+    const dateStr = timeNow.toLocaleDateString('vi-VN');
     if (step === 2) {
         activePickupTime = timeNow;
         const newId = packageCount + 1;
         const pkgCode = `PKG-${String(newId).padStart(4, '0')}`;
         const row = document.createElement('tr');
         row.id = `pkg-row-${newId}`;
+
         row.innerHTML = `
             <td class="font-mono text-blue font-bold">${pkgCode}</td>
-            <td>${timeStr}</td>
+            <td>${dateStr}</td> <td>${timeStr}</td>
             <td id="t-drop-${newId}" style="color: var(--text-dim);">--:--:--</td>
             <td id="t-diff-${newId}" style="color: var(--text-dim);">Đang tính...</td>
             <td id="t-stat-${newId}"><span class="tag tag-warn">Đang trung chuyển</span></td>
         `;
+
         tbody.appendChild(row);
         const tableWrap = document.getElementById('wmsTableWrap');
         tableWrap.scrollTop = tableWrap.scrollHeight;
@@ -498,30 +548,33 @@ function resetFromEmergency() {
     setMode('MANUAL');
     printLog('Hệ thống: Đã mở khóa hoàn toàn.', '#10b981');
 }
+// Hàm Gắp (Sửa lại để gửi số 160 hoặc 180 tùy giới hạn của Khoa)
 function manualPick() {
     if (currentMode !== 'MANUAL') {
         printLog('Lỗi: Hãy chuyển sang MANUAL để gắp!', true);
         return;
     }
-    // Giả sử J6 là kẹp hàng, 180 độ là đóng
-    sendToEra('V16', 180);
-    // Cập nhật giao diện thanh trượt J6 cho đồng bộ
-    if (document.getElementById('num6')) document.getElementById('num6').value = 180;
-    if (document.getElementById('range6')) document.getElementById('range6').value = 180;
+    const gripAngle = 160; // Góc đóng kẹp (theo code test của Khoa)
+    sendToEra('V16', gripAngle);
 
-    printLog('MANUAL: Lệnh GẮP HÀNG (J6 -> 180°)', '#10b981');
+    // Đồng bộ thanh trượt trên giao diện
+    if (document.getElementById('num6')) document.getElementById('num6').value = gripAngle;
+    if (document.getElementById('range6')) document.getElementById('range6').value = gripAngle;
+
+    printLog(`MANUAL: Lệnh GẮP HÀNG (V16 -> ${gripAngle}°)`, '#10b981');
 }
 
+// Hàm Thả
 function manualDrop() {
     if (currentMode !== 'MANUAL') {
         printLog('Lỗi: Hãy chuyển sang MANUAL để thả!', true);
         return;
     }
-    // Giả sử J6 là kẹp hàng, 0 độ là mở
-    sendToEra('V16', 0);
-    // Cập nhật giao diện thanh trượt J6 cho đồng bộ
-    if (document.getElementById('num6')) document.getElementById('num6').value = 0;
-    if (document.getElementById('range6')) document.getElementById('range6').value = 0;
+    const openAngle = 10; // Góc mở kẹp
+    sendToEra('V16', openAngle);
 
-    printLog('MANUAL: Lệnh THẢ HÀNG (J6 -> 0°)', '#f59e0b');
+    if (document.getElementById('num6')) document.getElementById('num6').value = openAngle;
+    if (document.getElementById('range6')) document.getElementById('range6').value = openAngle;
+
+    printLog(`MANUAL: Lệnh THẢ HÀNG (V16 -> ${openAngle}°)`, '#f59e0b');
 }

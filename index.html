@@ -79,15 +79,15 @@
                 <div class="d-pad-container">
                     <div class="d-pad">
                         <div class="empty"></div>
-                        <button class="btn-dir" onmousedown="move('F')" onmouseup="move('S')"><span>⯅</span></button>
+                        <button class="btn-dir" onmousedown="pressing('up')" onmouseup="release('up')"><span>⯅</span></button>
                         <div class="empty"></div>
 
-                        <button class="btn-dir" onmousedown="move('L')" onmouseup="move('S')"><span>⯇</span></button>
-                        <button class="btn-stop" onclick="move('FORCE_STOP')"><span>STOP</span></button>
-                        <button class="btn-dir" onmousedown="move('R')" onmouseup="move('S')"><span>⯈</span></button>
+                        <button class="btn-dir" onmousedown="pressing('left')" onmouseup="release('left')"><span>⯇</span></button>
+                        <button class="btn-stop" onclick="click('FORCE_STOP')"><span>STOP</span></button>
+                        <button class="btn-dir" onmousedown="pressing('right')" onmouseup="release('right')"><span>⯈</span></button>
 
                         <div class="empty"></div>
-                        <button class="btn-dir" onmousedown="move('B')" onmouseup="move('S')"><span>⯆</span></button>
+                        <button class="btn-dir" onmousedown="pressing('back')" onmouseup="release('back')"><span>⯆</span></button>
                         <div class="empty"></div>
                     </div>
 
@@ -140,7 +140,7 @@
 
             <section class="panel db-panel">
                 <div class="panel-header">
-                    <h2>Warehouse Management System (WMS)</h2>
+                    <h2>Management System</h2>
                     <button onclick="exportWMS()" class="btn-export">⬇ Xuất CSV</button>
                 </div>
                 <div class="table-wrap" id="wmsTableWrap">
@@ -148,10 +148,11 @@
                         <thead>
                             <tr>
                                 <th>Mã Kiện</th>
+                                <th>Ngày</th>
                                 <th>Gắp tại A (Time)</th>
                                 <th>Thả tại B (Time)</th>
                                 <th>T.Gian Vận Chuyển</th>
-                                <th>Trạng Thái WMS</th>
+                                <th>Trạng Thái</th>
                             </tr>
                         </thead>
                         <tbody id="wmsBody">
